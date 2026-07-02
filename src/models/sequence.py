@@ -1,6 +1,7 @@
-from src.models.enums import Base
+from src.models.enums import Base, MutationType
 from src.models.nucleotide import Nucleotide
 from src.models.stack import Stack
+from src.models.mutation import Mutation
 
 class Sequence:
     def __init__(self, sequence_id, species_name, sequence_type):
@@ -132,3 +133,56 @@ class Sequence:
             cur.position = index
             index += 1
             cur = cur.next
+
+
+#task3+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++=
+    # 应用突变
+    def apply_mutation(self, mutation):
+        if mutation.mutation_type == MutationType.INSERTION:
+            self.insert_nucleotide(
+                mutation.position,
+                mutation.new_base
+            )
+
+        elif mutation.mutation_type == MutationType.DELETION:
+            deleted = self.delete_nucleotide(
+                mutation.position
+            )
+            mutation.original_base = deleted
+
+        elif mutation.mutation_type == MutationType.SUBSTITUTION:
+            old = self.substitute_nucleotide(
+                mutation.position,
+                mutation.new_base
+            )
+            mutation.original_base = old
+
+        self.mutation_stack.push(mutation)
+
+    # 撤销最后一次突变
+    def undo_last_mutation(self):
+        if self.mutation_stack.is_empty():
+            return None
+
+        mutation = self.mutation_stack.pop()
+
+        if mutation.mutation_type == MutationType.INSERTION:
+            self.delete_nucleotide(mutation.position)
+
+        elif mutation.mutation_type == MutationType.DELETION:
+            self.insert_nucleotide(
+                mutation.position,
+                mutation.original_base
+            )
+
+        elif mutation.mutation_type == MutationType.SUBSTITUTION:
+            self.substitute_nucleotide(
+                mutation.position,
+                mutation.original_base
+            )
+
+        return mutation
+
+    # 返回突变历史
+    def mutation_history(self):
+        return self.mutation_stack.get_all()
