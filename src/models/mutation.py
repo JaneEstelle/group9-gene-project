@@ -1,4 +1,4 @@
-from models.enums import MutationType, Base
+from src.models.enums import MutationType, Base
 
 class Mutation:
     def __init__(self,

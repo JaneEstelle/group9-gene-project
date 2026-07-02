@@ -1,30 +1,32 @@
-from models.enums import Base
-from models.enums import SequenceType
-from models.enums import MutationType
+#task2
+from src.models.sequence import Sequence
+from src.models.enums import Base, SequenceType
 
-from models.sequence import Sequence
-from models.nucleotide import Nucleotide
-from models.mutation import Mutation
 
-sequence = Sequence(
-    "SEQ001",
-    "Human",
-    SequenceType.DNA
-)
+def main():
+    # 创建一个 DNA 序列
+    seq = Sequence("seq1", "Human", SequenceType.DNA)
 
-nucleotide = Nucleotide(
-    Base.A,
-    1
-)
+    # 插入一些碱基
+    seq.insert_nucleotide(0, Base.A)
+    seq.insert_nucleotide(1, Base.T)
+    seq.insert_nucleotide(2, Base.G)
+    seq.insert_nucleotide(3, Base.C)
 
-mutation = Mutation(
-    MutationType.SUBSTITUTION,
-    1,
-    Base.A,
-    Base.G
-)
+    print("original-sequence:", seq.get_sequence_string())
 
-print(sequence.sequence_id)
-print(sequence.species_name)
-print(nucleotide.base)
-print(mutation.mutation_type)
+    # 删除
+    seq.delete_nucleotide(1)
+    print("delete:", seq.get_sequence_string())
+
+    # 替换
+    seq.substitute_nucleotide(1, Base.T)
+    print("replace:", seq.get_sequence_string())
+
+    # 反向互补
+    rc = seq.reverse_complement()
+    print("suppletion:", rc.get_sequence_string())
+
+
+if __name__=="__main__":
+    main()

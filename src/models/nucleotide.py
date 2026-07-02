@@ -1,4 +1,4 @@
-from models.enums import Base
+from src.models.enums import Base
 
 class Nucleotide:
     def __init__(self, base: Base, position: int):
