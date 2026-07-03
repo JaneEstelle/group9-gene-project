@@ -14,6 +14,6 @@ class SequenceType(Enum):
 
 
 class MutationType(Enum):
-    INSERTION = "INSERTION"
-    DELETION = "DELETION"
-    SUBSTITUTION = "SUBSTITUTION"
+    INSERTION = "INSERTION"        # 插入碱基
+    DELETION = "DELETION"       # 删除碱基
+    SUBSTITUTION = "SUBSTITUTION"     #替换碱基
