@@ -1,0 +1,16 @@
+species_a,species_b,distance
+Macaca mulatta,Homo sapiens,3
+Macaca mulatta,Pan troglodytes,4
+Macaca mulatta,Gorilla gorilla,29
+Macaca mulatta,Pongo abelii,22
+Homo sapiens,Pan troglodytes,4
+Homo sapiens,Gorilla gorilla,31
+Homo sapiens,Pongo abelii,29
+Pan troglodytes,Gorilla gorilla,9
+Pan troglodytes,Pongo abelii,12
+Gorilla gorilla,Pongo abelii,3
+seq_05_01,seq_01_01,16
+seq_01_02,seq_04_01,9
+seq_05_02,seq_02_02,35
+seq_03_02,seq_02_02,13
+seq_04_02,seq_05_02,4

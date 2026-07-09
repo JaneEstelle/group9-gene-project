@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gene Sequence Visualization - Task 5</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #e8e8e8;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto auto;
+            gap: 20px;
+            padding: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .panel-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #00d4ff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .panel-title::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(180deg, #00d4ff, #00ff88);
+            border-radius: 2px;
+        }
+
+        .sequence-viewer { grid-column: 1; grid-row: 1; }
+        .mutation-history { grid-column: 2; grid-row: 1; }
+        .phylogenetic-graph { grid-column: 1; grid-row: 2; }
+        .comparison-panel { grid-column: 2; grid-row: 2; }
+
+        .nucleotide-chain {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .nucleotide-node {
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            font-weight: bold;
+            font-size: 1.1rem;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .nucleotide-node:hover {
+            transform: scale(1.15);
+            z-index: 10;
+            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.4);
+        }
+
+        .nucleotide-node::after {
+            content: '';
+            position: absolute;
+            right: -12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 10px;
+            height: 3px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 2px;
+        }
+
+        .nucleotide-node:last-child::after { display: none; }
+
+        .nucleotide-A { background: linear-gradient(135deg, #ff6b6b, #ee5a5a); border: 2px solid #ff8787; }
+        .nucleotide-T { background: linear-gradient(135deg, #ffd93d, #f0c000); border: 2px solid #ffe066; color: #333; }
+        .nucleotide-C { background: linear-gradient(135deg, #6bcb77, #5ab366); border: 2px solid #8ddb96; color: #333; }
+        .nucleotide-G { background: linear-gradient(135deg, #4d96ff, #3a84f0); border: 2px solid #6ba3ff; }
+
+        .node-index {
+            position: absolute;
+            bottom: -18px;
+            font-size: 0.7rem;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .sequence-selector {
+            margin-bottom: 15px;
+            padding: 8px 16px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: #e8e8e8;
+            font-size: 0.95rem;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .sequence-selector option { background: #1a1a2e; color: #e8e8e8; }
+
+        .mutation-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .mutation-item {
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            border-left: 4px solid #ff6b6b;
+            transition: all 0.3s ease;
+        }
+
+        .mutation-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(5px);
+        }
+
+        .mutation-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .mutation-type { font-weight: 600; color: #ff6b6b; }
+        .mutation-position { font-size: 0.85rem; color: rgba(255, 255, 255, 0.6); }
+
+        .mutation-change {
+            font-family: monospace;
+            font-size: 1rem;
+        }
+
+        .mutation-change span { margin: 0 5px; }
+        .mutation-original { color: #00d4ff; }
+        .mutation-new { color: #ffd93d; }
+
+        .phylogenetic-canvas {
+            width: 100%;
+            height: 450px;
+            min-width: 1000px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            position: relative;
+            overflow: auto;
+        }
+
+        .phylo-node {
+            position: absolute;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+
+        .phylo-node.species {
+            width: 28px;
+            height: 28px;
+            border: 3px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .phylo-node.sequence {
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .phylo-node:hover {
+            transform: scale(1.3);
+            z-index: 20;
+        }
+
+        .phylo-node.mst {
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.6);
+        }
+
+        .phylo-label {
+            position: absolute;
+            font-size: 0.68rem;
+            white-space: nowrap;
+            pointer-events: none;
+            max-width: 80px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .phylo-label.species {
+            font-weight: 600;
+            color: #00d4ff;
+        }
+
+        .phylo-label.sequence {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .phylo-edge {
+            position: absolute;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.2);
+            transform-origin: left center;
+            z-index: 1;
+        }
+
+        .phylo-edge.mst {
+            background: linear-gradient(90deg, #00ff88, #00d4ff);
+            box-shadow: 0 0 6px rgba(0, 255, 136, 0.4);
+            z-index: 5;
+        }
+
+        .sequence-pair-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .sequence-pair-selector select {
+            flex: 1;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: #e8e8e8;
+            font-size: 0.9rem;
+        }
+
+        .edit-distance-box {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            margin-bottom: 15px;
+        }
+
+        .edit-distance-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #00d4ff;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+        }
+
+        .edit-distance-label {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.6);
+            margin-left: 15px;
+        }
+
+        .alignment-display {
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.8rem;
+            line-height: 1.8;
+            max-height: 220px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .align-match { color: #00ff88; }
+        .align-mismatch { color: #ff6b6b; }
+        .align-gap { color: rgba(255, 255, 255, 0.4); }
+
+        .legend {
+            display: flex;
+            gap: 15px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+        }
+
+        .species-legend {
+            margin-top: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+        }
+
+        .species-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.85rem;
+        }
+
+        .species-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .species-color-hs { background: #ff6b6b; }
+        .species-color-pa { background: #ffd93d; }
+        .species-color-mm { background: #6bcb77; }
+        .species-color-gg { background: #4d96ff; }
+
+        @media (max-width: 1200px) {
+            .container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="panel sequence-viewer">
+            <div class="panel-title">Sequence Viewer</div>
+            <select class="sequence-selector" id="sequenceSelector" onchange="updateSequenceViewer()">
+                <option value="">Select a sequence</option>
+            </select>
+            <div class="nucleotide-chain" id="nucleotideChain"></div>
+            <div class="legend">
+                <div class="legend-item"><div class="legend-color" style="background: linear-gradient(135deg, #ff6b6b, #ee5a5a);"></div> Adenine (A)</div>
+                <div class="legend-item"><div class="legend-color" style="background: linear-gradient(135deg, #ffd93d, #f0c000);"></div> Thymine (T)</div>
+                <div class="legend-item"><div class="legend-color" style="background: linear-gradient(135deg, #6bcb77, #5ab366);"></div> Cytosine (C)</div>
+                <div class="legend-item"><div class="legend-color" style="background: linear-gradient(135deg, #4d96ff, #3a84f0);"></div> Guanine (G)</div>
+            </div>
+        </div>
+
+        <div class="panel mutation-history">
+            <div class="panel-title">Mutation History</div>
+            <select class="sequence-selector" id="mutationSelector" onchange="updateMutationHistory()">
+                <option value="">Select a sequence</option>
+            </select>
+            <div class="mutation-stack" id="mutationStack"></div>
+        </div>
+
+        <div class="panel phylogenetic-graph">
+            <div class="panel-title">Phylogenetic Graph (MST Highlighted)</div>
+            <div class="phylogenetic-canvas" id="phylogeneticCanvas"></div>
+            <div class="species-legend">
+                <div class="species-item"><div class="species-dot species-color-hs"></div> Homo sapiens</div>
+                <div class="species-item"><div class="species-dot species-color-pa"></div> Pongo abelii</div>
+                <div class="species-item"><div class="species-dot species-color-mm"></div> Macaca mulatta</div>
+                <div class="species-item"><div class="species-dot species-color-gg"></div> Gorilla gorilla</div>
+            </div>
+        </div>
+
+        <div class="panel comparison-panel">
+            <div class="panel-title">Comparison Panel</div>
+            <div class="sequence-pair-selector">
+                <select id="compareSeq1" onchange="updateComparison()">
+                    <option value="">Sequence 1</option>
+                </select>
+                <select id="compareSeq2" onchange="updateComparison()">
+                    <option value="">Sequence 2</option>
+                </select>
+            </div>
+            <div class="edit-distance-box">
+                <div class="edit-distance-value" id="editDistance">0</div>
+                <div class="edit-distance-label">Edit Distance</div>
+            </div>
+            <div class="alignment-display" id="alignmentDisplay">Select two sequences to compare</div>
+        </div>
+    </div>
+
+    <script>
+        const sequencesData = [
+            { id: 'seq_01_01', species: 'Homo sapiens', type: 'DNA', sequence: 'CATGTCTGTATTAGAGCCGGGCAA' },
+            { id: 'seq_01_02', species: 'Homo sapiens', type: 'DNA', sequence: 'CTTGTCTGTATTAGAGCCGGGCAA' },
+            { id: 'seq_01_03', species: 'Homo sapiens', type: 'DNA', sequence: 'GATGTCTTTATTAGAGCCGGGCAT' },
+            { id: 'seq_02_01', species: 'Pongo abelii', type: 'DNA', sequence: 'TGGTCGGGGACAGGCGCATGGTGGTCTCTCGACCCGGAATG' },
+            { id: 'seq_02_02', species: 'Pongo abelii', type: 'DNA', sequence: 'TTGTCGGGGACAGGCGCGTGGTGGTCTCTCGACCCGTAATG' },
+            { id: 'seq_02_03', species: 'Pongo abelii', type: 'DNA', sequence: 'TGGTCAGGGCCAGGCGGATGGTGGTCTCTCGACCCGGAATG' },
+            { id: 'seq_03_01', species: 'Macaca mulatta', type: 'DNA', sequence: 'TTTCGTCATGACATCGGGTTCTACAGTATACTAATGTGCACCTTTTGCTA' },
+            { id: 'seq_03_02', species: 'Macaca mulatta', type: 'DNA', sequence: 'TTTCGTCATGACATCGGGTTCTACAGTGTACTAATGTGCACCTGTTGCTA' },
+            { id: 'seq_04_01', species: 'Gorilla gorilla', type: 'DNA', sequence: 'CTTACCGGCGTACCATTCAGACGCTCACAGTCTCCAACGCCTCTGTTCGTGTCATCATTGGC' },
+            { id: 'seq_04_02', species: 'Gorilla gorilla', type: 'DNA', sequence: 'CTTACCGGCGTAACATTCAGACGCTCACAGTCTCAAACGCCTCTGTTCGTGTCATCATTGGC' }
+        ];
+
+        const mutationsData = [
+            { sequence_id: 'seq_01_01', mutation_type: 'SUBSTITUTION', position: 5, original_base: 'C', new_base: 'G' },
+            { sequence_id: 'seq_01_01', mutation_type: 'SUBSTITUTION', position: 14, original_base: 'A', new_base: 'G' },
+            { sequence_id: 'seq_01_01', mutation_type: 'SUBSTITUTION', position: 11, original_base: 'T', new_base: 'C' },
+            { sequence_id: 'seq_01_02', mutation_type: 'SUBSTITUTION', position: 9, original_base: 'A', new_base: 'C' },
+            { sequence_id: 'seq_01_02', mutation_type: 'SUBSTITUTION', position: 20, original_base: 'G', new_base: 'C' },
+            { sequence_id: 'seq_01_02', mutation_type: 'SUBSTITUTION', position: 5, original_base: 'C', new_base: 'T' },
+            { sequence_id: 'seq_01_02', mutation_type: 'SUBSTITUTION', position: 21, original_base: 'C', new_base: 'T' },
+            { sequence_id: 'seq_01_03', mutation_type: 'SUBSTITUTION', position: 19, original_base: 'G', new_base: 'T' },
+            { sequence_id: 'seq_01_03', mutation_type: 'SUBSTITUTION', position: 16, original_base: 'C', new_base: 'T' },
+            { sequence_id: 'seq_01_03', mutation_type: 'SUBSTITUTION', position: 8, original_base: 'T', new_base: 'C' },
+            { sequence_id: 'seq_02_01', mutation_type: 'SUBSTITUTION', position: 24, original_base: 'T', new_base: 'C' },
+            { sequence_id: 'seq_02_01', mutation_type: 'SUBSTITUTION', position: 18, original_base: 'T', new_base: 'A' },
+            { sequence_id: 'seq_02_01', mutation_type: 'SUBSTITUTION', position: 14, original_base: 'C', new_base: 'G' },
+            { sequence_id: 'seq_02_02', mutation_type: 'SUBSTITUTION', position: 20, original_base: 'G', new_base: 'A' },
+            { sequence_id: 'seq_02_02', mutation_type: 'SUBSTITUTION', position: 26, original_base: 'T', new_base: 'G' },
+            { sequence_id: 'seq_02_02', mutation_type: 'SUBSTITUTION', position: 36, original_base: 'T', new_base: 'C' },
+            { sequence_id: 'seq_02_02', mutation_type: 'SUBSTITUTION', position: 22, original_base: 'G', new_base: 'C' },
+            { sequence_id: 'seq_02_03', mutation_type: 'SUBSTITUTION', position: 20, original_base: 'G', new_base: 'T' },
+            { sequence_id: 'seq_02_03', mutation_type: 'SUBSTITUTION', position: 2, original_base: 'G', new_base: 'T' },
+            { sequence_id: 'seq_02_03', mutation_type: 'SUBSTITUTION', position: 18, original_base: 'T', new_base: 'C' },
+            { sequence_id: 'seq_02_03', mutation_type: 'SUBSTITUTION', position: 28, original_base: 'T', new_base: 'C' },
+            { sequence_id: 'seq_03_01', mutation_type: 'SUBSTITUTION', position: 17, original_base: 'G', new_base: 'C' },
+            { sequence_id: 'seq_03_01', mutation_type: 'SUBSTITUTION', position: 19, original_base: 'T', new_base: 'C' },
+            { sequence_id: 'seq_03_01', mutation_type: 'SUBSTITUTION', position: 44, original_base: 'T', new_base: 'A' },
+            { sequence_id: 'seq_03_01', mutation_type: 'SUBSTITUTION', position: 18, original_base: 'T', new_base: 'A' },
+            { sequence_id: 'seq_03_01', mutation_type: 'SUBSTITUTION', position: 46, original_base: 'G', new_base: 'A' },
+            { sequence_id: 'seq_03_02', mutation_type: 'SUBSTITUTION', position: 24, original_base: 'A', new_base: 'C' },
+            { sequence_id: 'seq_03_02', mutation_type: 'SUBSTITUTION', position: 0, original_base: 'T', new_base: 'A' },
+            { sequence_id: 'seq_03_02', mutation_type: 'SUBSTITUTION', position: 47, original_base: 'C', new_base: 'G' },
+            { sequence_id: 'seq_03_02', mutation_type: 'SUBSTITUTION', position: 3, original_base: 'C', new_base: 'T' },
+            { sequence_id: 'seq_04_01', mutation_type: 'SUBSTITUTION', position: 56, original_base: 'A', new_base: 'G' },
+            { sequence_id: 'seq_04_01', mutation_type: 'SUBSTITUTION', position: 29, original_base: 'G', new_base: 'C' },
+            { sequence_id: 'seq_04_01', mutation_type: 'SUBSTITUTION', position: 18, original_base: 'A', new_base: 'T' },
+            { sequence_id: 'seq_04_01', mutation_type: 'SUBSTITUTION', position: 25, original_base: 'C', new_base: 'G' },
+            { sequence_id: 'seq_04_01', mutation_type: 'SUBSTITUTION', position: 12, original_base: 'C', new_base: 'A' },
+            { sequence_id: 'seq_04_02', mutation_type: 'SUBSTITUTION', position: 5, original_base: 'C', new_base: 'A' },
+            { sequence_id: 'seq_04_02', mutation_type: 'SUBSTITUTION', position: 52, original_base: 'C', new_base: 'A' },
+            { sequence_id: 'seq_04_02', mutation_type: 'SUBSTITUTION', position: 54, original_base: 'T', new_base: 'G' },
+            { sequence_id: 'seq_04_02', mutation_type: 'SUBSTITUTION', position: 57, original_base: 'T', new_base: 'A' }
+        ];
+
+        const evolutionaryDistances = [
+            { species_a: 'Homo sapiens', species_b: 'Pongo abelii', distance: 3 },
+            { species_a: 'Homo sapiens', species_b: 'Gorilla gorilla', distance: 2 },
+            { species_a: 'Homo sapiens', species_b: 'Macaca mulatta', distance: 35 },
+            { species_a: 'Pongo abelii', species_b: 'Gorilla gorilla', distance: 4 },
+            { species_a: 'Pongo abelii', species_b: 'Macaca mulatta', distance: 28 },
+            { species_a: 'Gorilla gorilla', species_b: 'Macaca mulatta', distance: 2 },
+            { species_a: 'seq_02_01', species_b: 'seq_01_01', distance: 2 },
+            { species_a: 'seq_04_01', species_b: 'seq_03_02', distance: 4 },
+            { species_a: 'seq_01_02', species_b: 'seq_01_01', distance: 2 },
+            { species_a: 'seq_01_03', species_b: 'seq_04_01', distance: 6 },
+            { species_a: 'seq_02_02', species_b: 'seq_01_03', distance: 6 },
+            { species_a: 'seq_03_01', species_b: 'seq_02_02', distance: 4 },
+            { species_a: 'seq_04_01', species_b: 'seq_02_01', distance: 3 },
+            { species_a: 'seq_01_03', species_b: 'seq_04_02', distance: 6 },
+            { species_a: 'seq_01_03', species_b: 'seq_03_01', distance: 37 }
+        ];
+
+        const speciesColors = {
+            'Homo sapiens': '#ff6b6b',
+            'Pongo abelii': '#ffd93d',
+            'Macaca mulatta': '#6bcb77',
+            'Gorilla gorilla': '#4d96ff'
+        };
+
+        function getSpeciesForSequence(seqId) {
+            const seq = sequencesData.find(s => s.id === seqId);
+            return seq ? seq.species : 'Unknown';
+        }
+
+        function getAllNodes() {
+            const nodes = new Set();
+            evolutionaryDistances.forEach(edge => {
+                nodes.add(edge.species_a);
+                nodes.add(edge.species_b);
+            });
+            return Array.from(nodes);
+        }
+
+        function assignNodePositions(nodes) {
+            const positions = {};
+            const speciesCenters = {
+                'Homo sapiens': { x: 150, y: 200 },
+                'Pongo abelii': { x: 380, y: 200 },
+                'Macaca mulatta': { x: 650, y: 200 },
+                'Gorilla gorilla': { x: 850, y: 200 }
+            };
+
+            const speciesNodes = nodes.filter(n => !n.startsWith('seq_'));
+            const sequenceNodes = nodes.filter(n => n.startsWith('seq_'));
+
+            speciesNodes.forEach(species => {
+                if (speciesCenters[species]) {
+                    positions[species] = speciesCenters[species];
+                }
+            });
+
+            const speciesSeqMap = {};
+            sequenceNodes.forEach(seqId => {
+                const species = getSpeciesForSequence(seqId);
+                if (!speciesSeqMap[species]) {
+                    speciesSeqMap[species] = [];
+                }
+                speciesSeqMap[species].push(seqId);
+            });
+
+            const angleStep = 60;
+            const radius = 80;
+
+            Object.keys(speciesSeqMap).forEach(species => {
+                const center = speciesCenters[species];
+                if (!center) return;
+                
+                speciesSeqMap[species].forEach((seqId, index) => {
+                    const angle = (index * angleStep - 90) * Math.PI / 180;
+                    positions[seqId] = {
+                        x: center.x + Math.cos(angle) * radius,
+                        y: center.y + Math.sin(angle) * radius
+                    };
+                });
+            });
+
+            return positions;
+        }
+
+        function kruskalMST(nodes, edges) {
+            const parent = {};
+            const rank = {};
+
+            function makeSet(node) {
+                parent[node] = node;
+                rank[node] = 0;
+            }
+
+            function find(node) {
+                if (parent[node] !== node) {
+                    parent[node] = find(parent[node]);
+                }
+                return parent[node];
+            }
+
+            function union(node1, node2) {
+                const root1 = find(node1);
+                const root2 = find(node2);
+
+                if (root1 === root2) return false;
+
+                if (rank[root1] < rank[root2]) {
+                    parent[root1] = root2;
+                } else {
+                    parent[root2] = root1;
+                    if (rank[root1] === rank[root2]) {
+                        rank[root1]++;
+                    }
+                }
+                return true;
+            }
+
+            nodes.forEach(makeSet);
+
+            const sortedEdges = [...edges].sort((a, b) => a.distance - b.distance);
+
+            const mstEdges = [];
+            for (const edge of sortedEdges) {
+                if (union(edge.species_a, edge.species_b)) {
+                    mstEdges.push(edge);
+                    if (mstEdges.length === nodes.length - 1) break;
+                }
+            }
+
+            return mstEdges;
+        }
+
+        function initSelectors() {
+            const selectors = ['sequenceSelector', 'mutationSelector', 'compareSeq1', 'compareSeq2'];
+            selectors.forEach(id => {
+                const selector = document.getElementById(id);
+                sequencesData.forEach(seq => {
+                    const option = document.createElement('option');
+                    option.value = seq.id;
+                    option.textContent = `${seq.id} - ${seq.species}`;
+                    selector.appendChild(option);
+                });
+            });
+        }
+
+        function updateSequenceViewer() {
+            const selector = document.getElementById('sequenceSelector');
+            const chain = document.getElementById('nucleotideChain');
+            const seqId = selector.value;
+            
+            chain.innerHTML = '';
+            if (!seqId) return;
+            
+            const sequence = sequencesData.find(s => s.id === seqId);
+            if (!sequence) return;
+            
+            sequence.sequence.split('').forEach((base, index) => {
+                const node = document.createElement('div');
+                node.className = `nucleotide-node nucleotide-${base}`;
+                node.textContent = base;
+                
+                const indexSpan = document.createElement('span');
+                indexSpan.className = 'node-index';
+                indexSpan.textContent = index;
+                
+                node.appendChild(indexSpan);
+                chain.appendChild(node);
+            });
+        }
+
+        function updateMutationHistory() {
+            const selector = document.getElementById('mutationSelector');
+            const stack = document.getElementById('mutationStack');
+            const seqId = selector.value;
+            
+            stack.innerHTML = '';
+            if (!seqId) return;
+            
+            const mutations = mutationsData.filter(m => m.sequence_id === seqId);
+            
+            if (mutations.length === 0) {
+                stack.innerHTML = '<div style="text-align: center; color: rgba(255,255,255,0.5);">No mutations recorded</div>';
+                return;
+            }
+            
+            mutations.forEach((mutation, index) => {
+                const item = document.createElement('div');
+                item.className = 'mutation-item';
+                item.style.order = mutations.length - index;
+                
+                item.innerHTML = `
+                    <div class="mutation-header">
+                        <span class="mutation-type">${mutation.mutation_type}</span>
+                        <span class="mutation-position">Position ${mutation.position}</span>
+                    </div>
+                    <div class="mutation-change">
+                        <span class="mutation-original">${mutation.original_base}</span>
+                        <span style="color: rgba(255,255,255,0.4);">→</span>
+                        <span class="mutation-new">${mutation.new_base}</span>
+                    </div>
+                `;
+                
+                stack.appendChild(item);
+            });
+        }
+
+        function drawPhylogeneticGraph() {
+            const canvas = document.getElementById('phylogeneticCanvas');
+            canvas.innerHTML = '';
+            
+            const nodes = getAllNodes();
+            const positions = assignNodePositions(nodes);
+            const mstEdges = kruskalMST(nodes, evolutionaryDistances);
+            
+            const mstSet = new Set();
+            mstEdges.forEach(edge => {
+                const key1 = `${edge.species_a}-${edge.species_b}`;
+                const key2 = `${edge.species_b}-${edge.species_a}`;
+                mstSet.add(key1);
+                mstSet.add(key2);
+            });
+
+            evolutionaryDistances.forEach(edge => {
+                const fromPos = positions[edge.species_a];
+                const toPos = positions[edge.species_b];
+                
+                if (!fromPos || !toPos) return;
+                
+                const edgeDiv = document.createElement('div');
+                edgeDiv.className = 'phylo-edge';
+                
+                const dx = toPos.x - fromPos.x;
+                const dy = toPos.y - fromPos.y;
+                const length = Math.sqrt(dx * dx + dy * dy);
+                const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+                
+                edgeDiv.style.left = fromPos.x + 'px';
+                edgeDiv.style.top = fromPos.y - 1 + 'px';
+                edgeDiv.style.width = length + 'px';
+                edgeDiv.style.transform = `rotate(${angle}deg)`;
+                
+                const key = `${edge.species_a}-${edge.species_b}`;
+                if (mstSet.has(key)) {
+                    edgeDiv.classList.add('mst');
+                }
+                
+                canvas.appendChild(edgeDiv);
+            });
+            
+            nodes.forEach(node => {
+                const pos = positions[node];
+                if (!pos) return;
+                
+                const isSequence = node.startsWith('seq_');
+                const species = isSequence ? getSpeciesForSequence(node) : node;
+                const color = speciesColors[species] || '#888';
+                
+                const nodeDiv = document.createElement('div');
+                nodeDiv.className = `phylo-node ${isSequence ? 'sequence' : 'species'}`;
+                
+                const nodeSize = isSequence ? 14 : 28;
+                nodeDiv.style.left = pos.x - nodeSize / 2 + 'px';
+                nodeDiv.style.top = pos.y - nodeSize / 2 + 'px';
+                nodeDiv.style.backgroundColor = color;
+                
+                const isInMST = mstEdges.some(e => e.species_a === node || e.species_b === node);
+                if (isInMST) {
+                    nodeDiv.classList.add('mst');
+                }
+                
+                const label = document.createElement('div');
+                label.className = `phylo-label ${isSequence ? 'sequence' : 'species'}`;
+                label.textContent = node;
+                label.style.left = pos.x + nodeSize / 2 + 12 + 'px';
+                label.style.top = pos.y - 7 + 'px';
+                
+                canvas.appendChild(nodeDiv);
+                canvas.appendChild(label);
+            });
+        }
+
+        function calculateEditDistance(str1, str2) {
+            const m = str1.length;
+            const n = str2.length;
+            const dp = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+            
+            for (let i = 0; i <= m; i++) dp[i][0] = i;
+            for (let j = 0; j <= n; j++) dp[0][j] = j;
+            
+            for (let i = 1; i <= m; i++) {
+                for (let j = 1; j <= n; j++) {
+                    const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+                    dp[i][j] = Math.min(
+                        dp[i - 1][j] + 1,
+                        dp[i][j - 1] + 1,
+                        dp[i - 1][j - 1] + cost
+                    );
+                }
+            }
+            
+            return dp[m][n];
+        }
+
+        function getAlignment(str1, str2) {
+            const m = str1.length;
+            const n = str2.length;
+            const dp = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+            
+            for (let i = 0; i <= m; i++) dp[i][0] = i;
+            for (let j = 0; j <= n; j++) dp[0][j] = j;
+            
+            for (let i = 1; i <= m; i++) {
+                for (let j = 1; j <= n; j++) {
+                    const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+                    dp[i][j] = Math.min(
+                        dp[i - 1][j] + 1,
+                        dp[i][j - 1] + 1,
+                        dp[i - 1][j - 1] + cost
+                    );
+                }
+            }
+            
+            let i = m, j = n;
+            let align1 = '', align2 = '';
+            
+            while (i > 0 || j > 0) {
+                if (i > 0 && j > 0 && str1[i - 1] === str2[j - 1]) {
+                    align1 = str1[i - 1] + align1;
+                    align2 = str2[j - 1] + align2;
+                    i--; j--;
+                } else if (i > 0 && (j === 0 || dp[i - 1][j] <= dp[i][j - 1])) {
+                    align1 = str1[i - 1] + align1;
+                    align2 = '-' + align2;
+                    i--;
+                } else {
+                    align1 = '-' + align1;
+                    align2 = str2[j - 1] + align2;
+                    j--;
+                }
+            }
+            
+            return { align1, align2 };
+        }
+
+        function formatAlignmentLine(alignment, partnerAlignment) {
+            let html = '';
+            for (let i = 0; i < alignment.length; i++) {
+                const base = alignment[i];
+                const partnerBase = partnerAlignment[i];
+                
+                if (base === '-' || partnerBase === '-') {
+                    html += `<span class="align-gap">${base}</span>`;
+                } else if (base === partnerBase) {
+                    html += `<span class="align-match">${base}</span>`;
+                } else {
+                    html += `<span class="align-mismatch">${base}</span>`;
+                }
+            }
+            return html;
+        }
+
+        function updateComparison() {
+            const seq1Id = document.getElementById('compareSeq1').value;
+            const seq2Id = document.getElementById('compareSeq2').value;
+            const distanceDisplay = document.getElementById('editDistance');
+            const alignmentDisplay = document.getElementById('alignmentDisplay');
+            
+            if (!seq1Id || !seq2Id) {
+                distanceDisplay.textContent = '0';
+                alignmentDisplay.innerHTML = 'Select two sequences to compare';
+                return;
+            }
+            
+            const seq1 = sequencesData.find(s => s.id === seq1Id);
+            const seq2 = sequencesData.find(s => s.id === seq2Id);
+            
+            if (!seq1 || !seq2) return;
+            
+            const distance = calculateEditDistance(seq1.sequence, seq2.sequence);
+            distanceDisplay.textContent = distance;
+            
+            const alignment = getAlignment(seq1.sequence, seq2.sequence);
+            
+            const line1 = formatAlignmentLine(alignment.align1, alignment.align2);
+            const line2 = formatAlignmentLine(alignment.align2, alignment.align1);
+            
+            alignmentDisplay.innerHTML = `
+                <div style="color: rgba(255,255,255,0.7); margin-bottom: 5px;">${seq1Id} (${seq1.species}):</div>
+                <div>${line1}</div>
+                <div style="color: rgba(255,255,255,0.7); margin: 10px 0 5px;">${seq2Id} (${seq2.species}):</div>
+                <div>${line2}</div>
+            `;
+        }
+
+        window.addEventListener('load', () => {
+            initSelectors();
+            drawPhylogeneticGraph();
+            
+            document.getElementById('sequenceSelector').value = 'seq_01_01';
+            document.getElementById('mutationSelector').value = 'seq_01_01';
+            updateSequenceViewer();
+            updateMutationHistory();
+            
+            document.getElementById('compareSeq1').value = 'seq_01_01';
+            document.getElementById('compareSeq2').value = 'seq_01_02';
+            updateComparison();
+        });
+    </script>
+</body>
+</html>

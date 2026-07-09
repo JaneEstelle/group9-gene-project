@@ -1,0 +1,16 @@
+species_a,species_b,distance
+Pongo abelii,Gorilla gorilla,3
+Pongo abelii,Pan troglodytes,4
+Gorilla gorilla,Pan troglodytes,2
+seq_01_02,seq_01_01,4
+seq_01_01,seq_02_02,1
+seq_03_02,seq_01_04,8
+seq_01_04,seq_03_03,4
+seq_03_01,seq_01_01,40
+seq_03_02,seq_03_01,2
+seq_02_02,seq_02_01,3
+seq_01_04,seq_02_02,16
+seq_01_03,seq_01_01,19
+seq_03_03,seq_03_01,16
+seq_02_01,seq_03_03,38
+seq_03_03,seq_01_03,3
